@@ -15,6 +15,9 @@ A Home Assistant integration that allows you to receive LoRaWAN device data from
   * Basic unit of measurement detection.
   * Supports configuring multiple platforms / endpoints.
   * Header authentication.
+  * Entities and their last values survive Home Assistant restarts.
+  * MClimate Vicki: a climate entity (set target temperature) and a child lock switch.
+  * `chirpstack_http.send_downlink` action to send raw hex downlinks to any device.
 
 ## Requirements
 
@@ -52,6 +55,18 @@ A Home Assistant integration that allows you to receive LoRaWAN device data from
     ```
 3. OPTIONAL: Add http header and value if you configured it in home assistant.
 4. Ensure your Home Assistant instance is accessible from your ChirpStack server.
+
+## Downlinks (optional)
+
+Controlling devices (Vicki setpoint, child lock, `send_downlink`) needs the ChirpStack REST API
+([chirpstack-rest-api](https://github.com/chirpstack/chirpstack-rest-api)) reachable from Home Assistant.
+
+1. In ChirpStack, create an API key under **API keys**.
+2. In Home Assistant, open the integration and click **Configure**.
+3. Enter the REST API URL (e.g. `http://<chirpstack-host>:8090`) and the API key.
+
+LoRaWAN class A devices like the Vicki only receive downlinks right after they send an uplink, so changes
+apply on the device's next check-in. The new setpoint is shown immediately and kept until the device confirms it.
 
 ## Usage
 

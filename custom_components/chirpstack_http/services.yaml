@@ -1,0 +1,22 @@
+send_downlink:
+  fields:
+    dev_eui:
+      required: true
+      example: "0011223344556677"
+      selector:
+        text:
+    data:
+      required: true
+      example: "0E16"
+      selector:
+        text:
+    fport:
+      default: 2
+      selector:
+        number:
+          min: 1
+          max: 223
+    confirmed:
+      default: false
+      selector:
+        boolean:

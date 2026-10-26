@@ -1,0 +1,37 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "data": {
+          "url_suffix": "URL suffix",
+          "header_name": "Authentication header name (optional)",
+          "header_value": "Authentication header value (optional)"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "ChirpStack API (for downlinks)",
+        "description": "URL of the chirpstack-rest-api proxy (e.g. http://chirpstack:8090) and an API key from ChirpStack > API keys.",
+        "data": {
+          "api_url": "REST API URL",
+          "api_token": "API token"
+        }
+      }
+    }
+  },
+  "services": {
+    "send_downlink": {
+      "name": "Send downlink",
+      "description": "Enqueue a raw downlink for a LoRaWAN device in ChirpStack.",
+      "fields": {
+        "dev_eui": {"name": "DevEUI", "description": "Device EUI, e.g. 0011223344556677."},
+        "data": {"name": "Payload", "description": "Payload as hex, e.g. 0E16."},
+        "fport": {"name": "FPort", "description": "LoRaWAN FPort (default 2)."},
+        "confirmed": {"name": "Confirmed", "description": "Request a confirmed downlink."}
+      }
+    }
+  }
+}

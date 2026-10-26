@@ -5,6 +5,8 @@ import re
 from homeassistant.components.http import HomeAssistantView
 from .sensor import ChirpstackSensor
 from .binary_sensor import ChirpstackBinarySensor
+from .climate import ChirpstackVickiClimate, is_vicki
+from .switch import ChirpstackVickiChildLock
 from .helpers import detect_sensor_unit, detect_binary_sensor_device_class
 DOMAIN = "chirpstack_http"
 _LOGGER = logging.getLogger(__name__)
@@ -115,15 +117,11 @@ class ChirpstackHttpView(HomeAssistantView):
             # Initialize device dictionary if needed
             device_id = dev_eui
             hass_data = self.hass.data[DOMAIN][self.entry_id]
-            if device_id not in hass_data.get("devices", {}):
-                hass_data["devices"][device_id] = {}
+            hass_data["devices"].setdefault(device_id, {})
             
             # Track new entities
             new_sensors = []
             new_binary_sensors = []
-            
-            # Get any stored states for this device
-            stored_states = hass_data.get("stored_states", {}).get(device_id, {})
             
             # Process each data point
             for key, raw_value in flat_data.items():
@@ -146,10 +144,6 @@ class ChirpstackHttpView(HomeAssistantView):
                     entity.update_state(sanitized_value)
                     continue
                 
-                # Check if we have a stored state for this entity
-                stored_state = stored_states.get(key, {})
-                initial_value = sanitized_value
-                
                 detection_keys = [object_data.get("type_ref", {}).get(key, None), key]
                 
                 # Determine if boolean or sensor
@@ -168,36 +162,30 @@ class ChirpstackHttpView(HomeAssistantView):
                 
                 # Store in devices dict
                 hass_data["devices"].setdefault(device_id, {})[key] = entity
-                entity.set_initial_value(initial_value)
+                entity.set_initial_value(sanitized_value)
             
-            # Add new sensors to Home Assistant
+            # Platforms are set up before the view is registered, so add directly
             if new_sensors:
-                platform_function = hass_data.get("_platform_sensor")
-                if platform_function:
-                    _LOGGER.info(f"Adding {len(new_sensors)} sensors to Home Assistant using {platform_function}")
-                    try:
-                        platform_function(new_sensors)
-                        _LOGGER.info(f"Successfully added sensors: {[s.name for s in new_sensors]}")
-                    except Exception as e:
-                        _LOGGER.error(f"Error adding sensors: {e}")
-                        # Fall back to queuing
-                        _LOGGER.info("Falling back to queuing sensors")
-                        hass_data.setdefault("pending_sensors", []).extend(new_sensors)
-                else:
-                    _LOGGER.info(f"Queueing {len(new_sensors)} sensors for later addition (platform function not available)")
-                    hass_data.setdefault("pending_sensors", []).extend(new_sensors)
-                    # Debug what's in the hass_data
-                    _LOGGER.debug(f"Current hass_data keys: {list(hass_data.keys())}")
-            
-            # Add new binary sensors to Home Assistant
+                _LOGGER.info(f"Adding {len(new_sensors)} sensors to Home Assistant")
+                hass_data["_platform_sensor"](new_sensors)
             if new_binary_sensors:
-                if "_platform_binary_sensor" in hass_data:
-                    _LOGGER.info(f"Adding {len(new_binary_sensors)} binary sensors to Home Assistant")
-                    hass_data["_platform_binary_sensor"](new_binary_sensors)
-                else:
-                    _LOGGER.info(f"Queueing {len(new_binary_sensors)} binary sensors for later addition")
-                    hass_data.setdefault("pending_binary_sensors", []).extend(new_binary_sensors)
-            
+                _LOGGER.info(f"Adding {len(new_binary_sensors)} binary sensors to Home Assistant")
+                hass_data["_platform_binary_sensor"](new_binary_sensors)
+
+            # Thermostat + child lock entities for MClimate Vicki
+            for store, cls, platform in (
+                ("climates", ChirpstackVickiClimate, "_platform_climate"),
+                ("switches", ChirpstackVickiChildLock, "_platform_switch"),
+            ):
+                entity = hass_data[store].get(device_id)
+                if entity is None and is_vicki(flat_data):
+                    entry = self.hass.config_entries.async_get_entry(self.entry_id)
+                    entity = hass_data[store][device_id] = cls(entry, device_id, device_info)
+                    _LOGGER.info(f"Adding {platform[10:]} entity for {device_info['deviceName']}")
+                    hass_data[platform]([entity])
+                if entity is not None:
+                    entity.update_from_uplink(flat_data)
+
             # Return success
             return self.json({
                 "status": "ok",
